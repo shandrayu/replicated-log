@@ -22,3 +22,11 @@ The Replicated Log is a course project for distributed systems course in Ukraini
 ## Directory sctucture
 
 Project contains one directory for each team member. Every directory contains master and secondary directory with corresponding implementation inside.
+
+## Useful commands
+
+### Send REST message from the command line
+
+```bash
+curl -iv -X POST "http://localhost:55555/" -d '{"id": 1, "message": "my cool text message"}' 
+```
