@@ -6,7 +6,7 @@ The Replicated Log is a course project for distributed systems course in Ukraini
 
 - External communication: REST
   - Master
-    - APPEND[Message]
+    - POST - Append message
     - GET - returns list of messages
   - Secondary
     - GET - returns list of messages
