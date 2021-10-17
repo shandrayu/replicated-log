@@ -16,8 +16,12 @@ The Replicated Log is a course project for distributed systems course in Ukraini
 
 `json` with the followind fields:
 
-- message id, integer
-- data payload, string
+```json
+{
+    "id" : 1,
+    "message": "msg_log"
+}
+```
 
 ## Directory sctucture
 
