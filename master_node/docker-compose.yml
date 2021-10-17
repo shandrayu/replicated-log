@@ -1,0 +1,17 @@
+version: "3.5"
+services:
+  master:
+    image: "simplehttpserver:1.0"
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    command:
+        -m //localhost:8080
+        -s localhost:8081
+    volumes:
+      - "master_data:/master_data"
+
+
+volumes:
+  master_data:
+    driver: local
