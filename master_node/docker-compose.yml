@@ -7,10 +7,20 @@ services:
       - "8080:8080"
     command:
         -m //localhost:8080
-        -s localhost:8081
+        -s localhost:4545
+        -s localhost:4546
     volumes:
       - "master_data:/master_data"
-
+  secondary_1:
+    image: secondary-node:latest
+    restart: on-failure
+    ports:
+      - "4545:45454"
+  secondary_2:
+    image: secondary-node:latest
+    restart: on-failure
+    ports:
+      - "4546:45454"
 
 volumes:
   master_data:
