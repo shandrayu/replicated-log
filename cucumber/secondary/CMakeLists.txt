@@ -15,9 +15,15 @@ set(HEADERS
     ${COMMON_HEADERS}
 )
 
+set(JSONCPP_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/jsoncpp/dist/jsoncpp.cpp
+)
+
 set(SOURCES
     ${SOURCES}
+    ${JSONCPP_SOURCES}
 )
 
 add_executable(${PROJECT_LC} ${HEADERS} ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+target_include_directories(${PROJECT_LC} PRIVATE  ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/jsoncpp/dist)
 target_link_libraries(${PROJECT_LC} ${LIBRARIES})

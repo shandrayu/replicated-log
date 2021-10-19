@@ -2,8 +2,8 @@
 
 ## Functionality
 
-- `POST` - writes the message from request to internal memory
-- `GET` - returns the string with concatenated messages
+- `POST` - writes the message to internal memory. The new message with the same ID has no effect
+- `GET` - returns the json with stored messages
 
 ## Docker
 
@@ -16,13 +16,17 @@ docker run -p 4545:45454 secondary-node
 ### Send the packet to localhost, port 4545
 
 ```bash
-curl -iv -X POST "http://localhost:4545" -d 'Test da86fdsfsd' -H "Connection: close"
+curl -iv -X POST "http://localhost:4545" -d '{"id" : 9, "message": "dsfdsmsg_log"}' -H "Connection: close"
+```
+
+### Get list of messages in json format
+
+```bash
+curl -iv -X GET "http://localhost:4545" -H "Connection: close" 
 ```
 
 ## TODO
 
-- json parsing
-- indempotent add for messages
-- format output as a json
 - refactor the code
 - Dockerfile - install dependencies and build binary inside the docker
+- Introduce `delay` parameter to delay a response to master 
