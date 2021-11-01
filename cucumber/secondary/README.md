@@ -29,4 +29,3 @@ curl -iv -X GET "http://localhost:4545" -H "Connection: close"
 
 - refactor the code
 - Dockerfile - install dependencies and build binary inside the docker
-- Introduce `delay` parameter to delay a response to master 
