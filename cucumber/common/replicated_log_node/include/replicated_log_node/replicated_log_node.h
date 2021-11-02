@@ -25,8 +25,10 @@ class ReplicatedLogNode {
   struct Message {
     Message() = default;
     Message(const std::string& string);
+    // TODO: id shall be a field in this class
     Json::Value ToJson(int id) const;
     std::string data;
+    // TODO: is json really needed here? What it represents?
     Json::Value json;
   };
 
@@ -48,8 +50,8 @@ class ReplicatedLogNode {
 
  protected:
   std::map<int, Message> m_messages;
-  // TODO: Inplementation details
+  // TODO: Implementation details
   std::unique_ptr<Json::CharReader> m_char_reader;
 };
 
-#endif  // REPLICATED_LOG_NODE_REPLICATED_LOG_NODE_H__
+#endif // REPLICATED_LOG_NODE_REPLICATED_LOG_NODE_H__

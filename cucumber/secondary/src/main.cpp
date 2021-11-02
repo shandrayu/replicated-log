@@ -36,7 +36,7 @@ class LogApplication : public Mif::Application::HttpServer {
       : Mif::Application::HttpServer(argc, argv),
         m_replicated_log(std::make_shared<ReplicatedLogSecondary>()) {
     boost::program_options::options_description options{
-        "Log Application options"};
+        "Replicated Log Application, secondary node options"};
 
     options.add_options()(
         Detail::Config::ConstantDelay::Value,
