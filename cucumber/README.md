@@ -2,7 +2,9 @@
 
 ## Prerequisites
 
-Run `download_third_party.sh`
+Run `setup.sh`
+
+The script downloads all third-party libraries and runs build.
 
 ## How to build
 
@@ -28,8 +30,12 @@ curl -iv -X POST "http://localhost:55555/" -d 'json with message' -H "Connection
     docker-compose up -d
 ```
 
-### Get list of messages (string with concatenated data from all messages, undtructured)
+### Get list of messages
 
 ```bash
 curl -iv -X GET "http://localhost:55555/" -H "Connection: close"
 ```
+
+## TODO
+
+- Implements correct handling for mif library
