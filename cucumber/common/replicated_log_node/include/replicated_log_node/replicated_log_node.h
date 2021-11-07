@@ -22,6 +22,9 @@
 class ReplicatedLogNode {
  public:
   // TODO: public data fields, struct instead of class...
+  // TODO: create two Message classes: internal and external
+  // internal: id, data
+  // external: data, write_concern
   struct Message {
     Message() = default;
     Message(const std::string& string);
@@ -40,8 +43,8 @@ class ReplicatedLogNode {
   virtual ~ReplicatedLogNode() = default;
 
  private:
-  virtual void PostHandlerAdditionalFunctionality(
-      int message_id, const std::string& message_body);
+  virtual Mif::Net::Http::Code StoreMessage(int message_id,
+                                            const std::string& message_body);
 
   void GetHandler(Mif::Net::Http::IInputPack const& request,
                   Mif::Net::Http::IOutputPack& response);
@@ -54,4 +57,4 @@ class ReplicatedLogNode {
   std::unique_ptr<Json::CharReader> m_char_reader;
 };
 
-#endif // REPLICATED_LOG_NODE_REPLICATED_LOG_NODE_H__
+#endif  // REPLICATED_LOG_NODE_REPLICATED_LOG_NODE_H__

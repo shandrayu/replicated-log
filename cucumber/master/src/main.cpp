@@ -2,8 +2,11 @@
 #include <cpr/cpr.h>
 #include <mif/common/log.h>
 
+#include <chrono>
+#include <future>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "replicated_log_node/replicated_log_node.h"
@@ -34,34 +37,90 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
     }
   }
 
+  void SetupWriteConcern(std::size_t write_concern,
+                         std::size_t responce_timeout) {
+    if (write_concern > 1 && write_concern < m_secondaries.size() + 1) {
+      m_write_concern = write_concern;
+    } else if (write_concern >= m_secondaries.size() + 1) {
+      m_write_concern = m_secondaries.size() + 1;
+      MIF_LOG(Info)
+          << "Write concern cannot be more than number of available "
+             "nodes + master node. Setting write concern to maximum level "
+          << m_write_concern;
+    }
+    m_responce_timeout = responce_timeout;
+  }
+
  private:
-  virtual void PostHandlerAdditionalFunctionality(
+  virtual Mif::Net::Http::Code StoreMessage(
       int message_id, const std::string& message_body) override {
-    Mif::Common::Unused(message_id);
-    Mif::Common::Unused(message_body);
-    auto json_message =
-        m_messages[message_id].ToJson(message_id).toStyledString();
+    const auto message = Message(message_body);
+    auto json_message = message.ToJson(message_id).toStyledString();
+
+    std::size_t current_concert_level = 1;
+    std::vector<std::pair<std::string, std::future<cpr::Response>>>
+        node_response;
+    node_response.reserve(m_secondaries.size());
+    std::chrono::system_clock::time_point timeout =
+        std::chrono::system_clock::now() +
+        std::chrono::milliseconds(m_responce_timeout);
     for (const auto secondary : m_secondaries) {
       std::string url_string = secondary.host + ":" + secondary.port;
-      cpr::Response r =
-          cpr::Post(cpr::Url{url_string}, cpr::Body(json_message));
-      MIF_LOG(Info) << "Post message to " << url_string;
-      if (r.status_code == cpr::status::HTTP_OK) {
-        MIF_LOG(Info) << "Done!";
+
+      std::promise<cpr::Response> p1;
+      std::future<cpr::Response> f_completes = p1.get_future();
+      std::thread(
+          [](std::promise<cpr::Response> p1, const std::string& url_str,
+             const std::string& mesage_str) {
+            cpr::Response r =
+                cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str));
+            p1.set_value_at_thread_exit(r);
+          },
+          std::move(p1), url_string, json_message)
+          .detach();
+
+      node_response.push_back(
+          std::make_pair(url_string, std::move(f_completes)));
+    }
+
+    // Gather results
+    for (auto& responce : node_response) {
+      MIF_LOG(Info) << "secondary node " << responce.first;
+      if (std::future_status::ready == responce.second.wait_until(timeout)) {
+        auto status_code = responce.second.get().status_code;
+        if (status_code == cpr::status::HTTP_OK) {
+          MIF_LOG(Info) << "Done!";
+          current_concert_level++;
+        } else {
+          MIF_LOG(Info) << "Post message is not successfull. Status code "
+                        << status_code;
+        }
       } else {
-        MIF_LOG(Info) << "Post message confirmation is not received.";
-        continue;
+        MIF_LOG(Info) << "Post message confirmation is not received";
       }
+    }
+
+    if (current_concert_level >= m_write_concern) {
+      // write message to master node. Responce OK
+      m_messages[message_id] = message;
+      return Mif::Net::Http::Code::Ok;
+    } else {
+      // do not write message. response
+      return Mif::Net::Http::Code::NotModified;
     }
   }
 
   std::vector<Secondary> m_secondaries;
+  std::size_t m_write_concern{1};
+  std::size_t m_responce_timeout{1000};
 };
 
 namespace {
 namespace Detail {
 namespace Config {
 using SecondaryNodes = MIF_STATIC_STR("secondarynodes");
+using WriteConcernLevel = MIF_STATIC_STR("writeconcernlevel");
+using ResponseTimeout = MIF_STATIC_STR("responsetimeout");
 }  // namespace Config
 }  // namespace Detail
 }  // namespace
@@ -81,7 +140,17 @@ class LogApplication : public Mif::Application::HttpServer {
         boost::program_options::value<std::string>(&m_secondaries)
             ->default_value(""),
         "List of secondary nodes in a format host1:port1;host2:port2 "
-        "(0.0.0.0:55555,0.0.0.0:44444)");
+        "(0.0.0.0:55555,0.0.0.0:44444)")(
+        Detail::Config::WriteConcernLevel::Value,
+        boost::program_options::value<std::size_t>(&m_write_concern_level)
+            ->default_value(1),
+        "Write concern level. Perform append only if the amount of write "
+        "confirmations received before the timeout is bigger than write "
+        "concern level")(
+        Detail::Config::ResponseTimeout::Value,
+        boost::program_options::value<std::size_t>(&m_response_timeout_ms)
+            ->default_value(1000),
+        "Secondary node response timeout, ms");
 
     AddCustomOptions(options);
   }
@@ -92,10 +161,14 @@ class LogApplication : public Mif::Application::HttpServer {
         "/", std::bind(&ReplicatedLogMaster::RequestHandler, m_replicated_log,
                        std::placeholders::_1, std::placeholders::_2));
     m_replicated_log->SetSecondaryNodesList(m_secondaries);
+    m_replicated_log->SetupWriteConcern(m_write_concern_level,
+                                        m_response_timeout_ms);
   }
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
   std::string m_secondaries;
+  std::size_t m_write_concern_level;
+  std::size_t m_response_timeout_ms;
 };
 
 int main(int argc, char const** argv) {
