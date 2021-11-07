@@ -1,20 +1,30 @@
 FROM ubuntu:20.04
 
-RUN apt-get update && apt-get install -y libssl-dev
-
 EXPOSE 35353
 
-ENV WORKDIR="/opt" \
+ENV DEBIAN_FRONTEND=noninteractive \ 
+    WORKDIR="/opt" \
     APP_BIN="replicated_log_master" \
-    OPTS="--host=0.0.0.0 --port=35353 --secondarynodes=0.0.0.0:45454" \
-    LD_LIBRARY_PATH="/lib"
+    OPTS="--host=0.0.0.0 --port=35353 --secondarynodes=0.0.0.0:45454"
 
-COPY bin/$APP_BIN $WORKDIR
-# TODO: how to manage linking to library properly?
-COPY build/_deps/cpr-build/cpr/libcpr.so $LD_LIBRARY_PATH
-COPY build/_deps/cpr-build/cpr/libcpr.so.1 $LD_LIBRARY_PATH
-COPY build/_deps/cpr-build/cpr/libcpr.so.1.6 $LD_LIBRARY_PATH
-COPY build/_deps/curl-build/lib/libcurl-d.so $LD_LIBRARY_PATH
+RUN apt-get update && \ 
+    apt-get install -y git cmake wget build-essential python3 zlib1g-dev libssl-dev
+RUN cd $WORKDIR && \
+    git clone https://github.com/shandrayu/replicated-log.git && \
+    cd replicated-log && \
+    git checkout update_cucumber_scripts && \
+    cd cucumber && \
+    ./setup.sh
+RUN cd $WORKDIR/replicated-log/cucumber/third_party/mif && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make
+RUN cd $WORKDIR/replicated-log/cucumber/secondary && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make
 
 WORKDIR $WORKDIR
-ENTRYPOINT ./$APP_BIN $OPTS
+ENTRYPOINT .$WORKDIR/replicated-log/cucumber/master/bin/$APP_BIN $OPTS
