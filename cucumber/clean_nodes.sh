@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -R master/bin -y
-rm -R master/build -y
-rm -R secondary/bin -y
-rm -R secondary/build -y
+rm -R master/bin
+rm -R master/build
+rm -R secondary/bin
+rm -R secondary/build
