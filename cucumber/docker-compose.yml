@@ -1,7 +1,7 @@
 version: "3.5"
 services:
   master:
-    image: "master-node:latest"
+    image: "master-node:1.0"
     restart: on-failure
     ports:
       - "35353:35353"
@@ -13,12 +13,12 @@ services:
     ports:
       - "5555:45454"
   secondary_2:
-    image: secondary-node:latest
+    image: secondary-node:1.1
     restart: on-failure
     ports:
       - "44444:45454"
   secondary_3:
-    image: secondary-node:latest
+    image: secondary-node:1.1
     restart: on-failure
     ports:
       - "7777:45454"

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 project(replicated_log_master)
 set(PROJECT ${PROJECT_NAME})

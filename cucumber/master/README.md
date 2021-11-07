@@ -1,8 +1,8 @@
-# Replicated log - master node imlementation
+# Replicated log - master node implementation
 
 ## Functionality
 
-- `POST` - writes the message to internal memory and sends the message to all gregistered secondaries. The new message with the same ID has no effect
+- `POST` - writes the message to internal memory and sends the message to all registered secondaries. The new message with the same ID has no effect
 - `GET` - returns the json with stored messages
 
 ## Docker
