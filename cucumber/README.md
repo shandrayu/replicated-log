@@ -4,7 +4,17 @@
 
 Run `setup.sh`
 
-The script downloads all third-party libraries and runs build.
+The script downloads all third-party libraries.
+
+Build `mif` library.
+
+```bash
+cd third_party/mif
+mkdir build
+cd build
+cmake ..
+make
+```
 
 ## How to build
 
@@ -38,4 +48,5 @@ curl -iv -X GET "http://localhost:55555/" -H "Connection: close"
 
 ## TODO
 
-- Implements correct handling for mif library
+- Implements correct handling for mif library dependencies
+- Fix docker networking
