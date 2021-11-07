@@ -10,11 +10,16 @@ class ReplicatedLogSecondary : public ReplicatedLogNode {
   }
 
  private:
-  virtual void PostHandlerAdditionalFunctionality(
+  virtual Mif::Net::Http::Code StoreMessage(
       int message_id, const std::string& message_body) override {
-    Mif::Common::Unused(message_id);
-    Mif::Common::Unused(message_body);
     std::this_thread::sleep_for(std::chrono::milliseconds(m_response_delay_ms));
+    auto id_position = m_messages.find(message_id);
+    if (id_position == m_messages.end()) {
+      m_messages[message_id] = Message(message_body);
+    } else {
+      // Nothing, message is present in database
+    }
+    return Mif::Net::Http::Code::Ok;
   }
 
   std::size_t m_response_delay_ms{0};

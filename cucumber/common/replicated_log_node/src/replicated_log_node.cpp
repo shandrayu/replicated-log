@@ -23,7 +23,7 @@ std::vector<char> convert_messages_to_buffer(
   return buffer;
 }
 }  // namespace detail
-}
+}  // namespace
 
 ReplicatedLogNode::Message::Message(const std::string& string) : data(string) {}
 
@@ -49,10 +49,11 @@ void ReplicatedLogNode::RequestHandler(
   }
 }
 
-void ReplicatedLogNode::PostHandlerAdditionalFunctionality(
+Mif::Net::Http::Code ReplicatedLogNode::StoreMessage(
     int message_id, const std::string& message_body) {
   Mif::Common::Unused(message_id);
   Mif::Common::Unused(message_body);
+  return Mif::Net::Http::Code::NotImplemented;
 }
 
 void ReplicatedLogNode::GetHandler(Mif::Net::Http::IInputPack const& request,
@@ -80,22 +81,16 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
   bool parsing_successful = m_char_reader->parse(
       data.data(), data.data() + data.size(), &root, &errors);
   if (!parsing_successful) {
-    MIF_LOG(Info) << errors;
+    MIF_LOG(Info) << "Error in message parsing: " << errors;
     response.SetCode(Mif::Net::Http::Code::BadRequest);
     return;
   }
 
   const auto id = root["id"].asInt();
   const auto message_body = root["message"].asString();
-  auto id_position = m_messages.find(id);
-  if (id_position == m_messages.end()) {
-    m_messages[id] = Message(message_body);
-  } else {
-    // Nothing, message is present in database
-  }
 
-  PostHandlerAdditionalFunctionality(id, message_body);
-
-  MIF_LOG(Info) << "Post: OK";
-  response.SetCode(Mif::Net::Http::Code::Ok);
+  const auto status = StoreMessage(id, message_body);
+  MIF_LOG(Info) << "Done! Status "
+                << ((Mif::Net::Http::Code::Ok == status) ? "OK" : "not OK :)");
+  response.SetCode(status);
 }
