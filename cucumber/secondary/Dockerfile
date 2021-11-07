@@ -27,4 +27,4 @@ RUN cd $WORKDIR/replicated-log/cucumber/secondary && \
     make
 
 WORKDIR $WORKDIR
-ENTRYPOINT $WORKDIR/replicated-log/cucumber/secondary/bin/$APP_BIN $OPTS
+ENTRYPOINT .$WORKDIR/replicated-log/cucumber/secondary/bin/$APP_BIN $OPTS
