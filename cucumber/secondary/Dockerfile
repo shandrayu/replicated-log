@@ -12,7 +12,6 @@ RUN apt-get update && \
 RUN cd $WORKDIR && \
     git clone https://github.com/shandrayu/replicated-log.git && \
     cd replicated-log && \
-    git checkout update_cucumber_scripts && \
     cd cucumber && \
     ./setup.sh
 RUN cd $WORKDIR/replicated-log/cucumber/third_party/mif && \
@@ -26,5 +25,5 @@ RUN cd $WORKDIR/replicated-log/cucumber/secondary && \
     cmake .. && \
     make
 
-WORKDIR $WORKDIR
-ENTRYPOINT .$WORKDIR/replicated-log/cucumber/secondary/bin/$APP_BIN $OPTS
+WORKDIR $WORKDIR/replicated-log/cucumber/secondary/bin
+CMD ./$APP_BIN $OPTS
