@@ -115,6 +115,7 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
         } else if (std::future_status::ready ==
                    responce.furute.wait_until(timeout)) {
           const auto http_response = responce.furute.get();
+          responce.is_received = true;
           auto status_code = http_response.status_code;
           if (cpr::status::HTTP_OK == status_code) {
             current_concert_level++;
