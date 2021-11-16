@@ -45,9 +45,9 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
 
   void SetupWriteConcern(std::size_t write_concern,
                          std::size_t responce_timeout) {
-    if (write_concern > 1 && write_concern < m_secondaries.size() + 1) {
+    if (write_concern > 1 && write_concern <= m_secondaries.size() + 1) {
       m_write_concern = write_concern;
-    } else if (write_concern >= m_secondaries.size() + 1) {
+    } else if (write_concern > m_secondaries.size() + 1) {
       m_write_concern = m_secondaries.size() + 1;
       MIF_LOG(Info)
           << "Write concern cannot be more than number of available "
