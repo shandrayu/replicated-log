@@ -36,16 +36,18 @@ curl -iv -X GET "http://localhost:55555/" -H "Connection: close"
 
 ## TODO
 
-- Implements correct handling for mif library dependencies
-- Replace mif library to other http server
-- Fix docker networking
-- Refactor the code (master and secondary)
-- Refactor application class out of main.cpp
+- write_concern_level is master node's parameter not message field
+- Waiting for the response is implemented as "retry with increasing timeout"
+  - CountDownLatch can be implemented
+- message_id in messages shall be an internal counter incremented by master (and not external field as it is now)
+  - Create two Message classes: internal and external
+- Code organization
+  - Code is in one file and has to be refactored for the further use
+- No synchronization
+  - Node's internal data storage is not protected by mutex or other synchronization primitive. While it's not an issue in this setup, the internal storage shall be guarded with mutex
+- Docker networking
+  - container builds and runs but static ip address and communication between containers is needed
 - Add faulty message handling to the nodes
-- Create two Message classes: internal and external
-- Introduce GRPC for internal communication
-- Pass write concern as a message parameter (or as a constant parameter in classes)
-- Write concern: how to remove messages from a secondary node if write concern is not met? Create one more buffer?
 
 ## Useful commands
 
