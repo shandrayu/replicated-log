@@ -14,16 +14,16 @@ The Replicated Log is a course project for distributed systems course in Ukraini
 
 ## Message format
 
-`json` with the followind fields:
+`json` with the following fields:
 
 ```json
 {
-    "id" : 1,
+    "write_concern" : 4,
     "message": "msg_log"
 }
 ```
 
-## Directory sctucture
+## Directory structure
 
 Project contains one directory for each team member. Every directory contains master and secondary directory with corresponding implementation inside.
 
@@ -32,5 +32,5 @@ Project contains one directory for each team member. Every directory contains ma
 ### Send REST message from the command line
 
 ```bash
-curl -iv -X POST "http://localhost:55555/" -d '{"id": 1, "message": "my cool text message"}' 
+curl -iv -X POST "http://localhost:55555/" -d '{"write_concern": 4, "message": "my cool text message"}' 
 ```

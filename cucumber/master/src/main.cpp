@@ -43,43 +43,23 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
     }
   }
 
-  void SetupWriteConcern(std::size_t write_concern,
-                         std::size_t responce_timeout) {
-    if (write_concern > 1 && write_concern <= m_secondaries.size() + 1) {
-      m_write_concern = write_concern;
-    } else if (write_concern > m_secondaries.size() + 1) {
-      m_write_concern = m_secondaries.size() + 1;
-      MIF_LOG(Info)
-          << "Write concern cannot be more than number of available "
-             "nodes + master node. Setting write concern to maximum level "
-          << m_write_concern;
-    }
-    m_responce_timeout = responce_timeout;
-  }
-
  private:
-  virtual Mif::Net::Http::Code StoreMessage(
-      int message_id, const std::string& message_body) override {
-    const auto message = Message(message_body);
-
-    auto id_position = m_messages.find(message_id);
-    // TODO: change message_id meaning. It shall be a counter
-    // increased internally in master not external data
-    if (id_position == m_messages.end()) {
-      m_messages[message_id] = Message(message_body);
-      SendMessageToSecondaries(message_id, message);
-    } else {
-      // Nothing, message is present in database
-    }
+  virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override {
+    const auto message_body = node["message"].asString();
+    const std::size_t write_concern = node["write_concern"].asUInt();
+    const auto message = InternalMessage(m_message_id, message_body);
+    m_messages[m_message_id] = message;
+    SendMessageToSecondaries(message, write_concern);
+    m_message_id++;
     return Mif::Net::Http::Code::Ok;
   }
 
-  void SendMessageToSecondaries(int message_id, Message message) {
-    // TODO: Readabiliry - move lambdas to class methods?
-    auto SendMessages = [this](int message_id,
-                               Message message) -> std::vector<NodeResponce> {
-      auto json_message = message.ToJson(message_id).toStyledString();
-
+  void SendMessageToSecondaries(InternalMessage message,
+                                std::size_t write_concern) {
+    // TODO: Readability - move lambdas to class methods?
+    auto SendMessages =
+        [this](InternalMessage message) -> std::vector<NodeResponce> {
+      auto json_message = message.ToJson().toStyledString();
       std::vector<NodeResponce> node_response;
       node_response.reserve(m_secondaries.size());
 
@@ -132,26 +112,25 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
       return current_concert_level;
     };
 
-    auto node_responce = SendMessages(message_id, message);
+    auto node_responce = SendMessages(message);
 
     std::chrono::milliseconds retry_delay;
     std::chrono::system_clock::time_point timeout;
     do {
       retry_delay = std::chrono::milliseconds(m_responce_timeout);
       timeout = std::chrono::system_clock::now() + retry_delay;
-    } while (m_write_concern > GatherResponses(node_responce, timeout));
+    } while (write_concern > GatherResponses(node_responce, timeout));
   }
 
   std::vector<Secondary> m_secondaries;
-  std::size_t m_write_concern{1};
   std::size_t m_responce_timeout{1000};
+  std::size_t m_message_id{0};
 };
 
 namespace {
 namespace Detail {
 namespace Config {
 using SecondaryNodes = MIF_STATIC_STR("secondarynodes");
-using WriteConcernLevel = MIF_STATIC_STR("writeconcernlevel");
 using ResponseTimeout = MIF_STATIC_STR("responsetimeout");
 }  // namespace Config
 }  // namespace Detail
@@ -173,16 +152,10 @@ class LogApplication : public Mif::Application::HttpServer {
             ->default_value(""),
         "List of secondary nodes in a format host1:port1;host2:port2 "
         "(0.0.0.0:55555,0.0.0.0:44444)")(
-        Detail::Config::WriteConcernLevel::Value,
-        boost::program_options::value<std::size_t>(&m_write_concern_level)
-            ->default_value(1),
-        "Write concern level. Perform append only if the amount of write "
-        "confirmations received before the timeout is bigger than write "
-        "concern level")(Detail::Config::ResponseTimeout::Value,
-                         boost::program_options::value<std::size_t>(
-                             &m_response_timeout_ms)
-                             ->default_value(1000),
-                         "Secondary node response timeout, ms");
+        Detail::Config::ResponseTimeout::Value,
+        boost::program_options::value<std::size_t>(&m_response_timeout_ms)
+            ->default_value(1000),
+        "Secondary node response timeout, ms");
 
     AddCustomOptions(options);
   }
@@ -193,13 +166,10 @@ class LogApplication : public Mif::Application::HttpServer {
         "/", std::bind(&ReplicatedLogMaster::RequestHandler, m_replicated_log,
                        std::placeholders::_1, std::placeholders::_2));
     m_replicated_log->SetSecondaryNodesList(m_secondaries);
-    m_replicated_log->SetupWriteConcern(m_write_concern_level,
-                                        m_response_timeout_ms);
   }
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
   std::string m_secondaries;
-  std::size_t m_write_concern_level;
   std::size_t m_response_timeout_ms;
 };
 

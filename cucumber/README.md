@@ -25,7 +25,7 @@ make
 ### Send message to the node
 
 ```bash
-curl -iv -X POST "http://localhost:55555/" -d 'json with message' -H "Connection: close"
+curl -iv -X POST "http://localhost:55555/" -d '{"write_concern": 4, "message": "my cool text message"}' -H "Connection: close"
 ```
 
 ### Get list of messages
@@ -36,11 +36,8 @@ curl -iv -X GET "http://localhost:55555/" -H "Connection: close"
 
 ## TODO
 
-- write_concern_level is master node's parameter not message field
 - Waiting for the response is implemented as "retry with increasing timeout"
   - CountDownLatch can be implemented
-- message_id in messages shall be an internal counter incremented by master (and not external field as it is now)
-  - Create two Message classes: internal and external
 - Code organization
   - Code is in one file and has to be refactored for the further use
 - No synchronization
