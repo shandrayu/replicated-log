@@ -19,6 +19,12 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
     std::string port;
   };
 
+  struct NodeResponce {
+    std::string url;
+    bool is_received;
+    std::future<cpr::Response> furute;
+  };
+
   ReplicatedLogMaster() = default;
   virtual ~ReplicatedLogMaster() = default;
 
@@ -37,89 +43,94 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
     }
   }
 
-  void SetupWriteConcern(std::size_t write_concern,
-                         std::size_t responce_timeout) {
-    if (write_concern > 1 && write_concern < m_secondaries.size() + 1) {
-      m_write_concern = write_concern;
-    } else if (write_concern >= m_secondaries.size() + 1) {
-      m_write_concern = m_secondaries.size() + 1;
-      MIF_LOG(Info)
-          << "Write concern cannot be more than number of available "
-             "nodes + master node. Setting write concern to maximum level "
-          << m_write_concern;
-    }
-    m_responce_timeout = responce_timeout;
+ private:
+  virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override {
+    const auto message_body = node["message"].asString();
+    const std::size_t write_concern = node["write_concern"].asUInt();
+    const auto message = InternalMessage(m_message_id, message_body);
+    m_messages[m_message_id] = message;
+    SendMessageToSecondaries(message, write_concern);
+    m_message_id++;
+    return Mif::Net::Http::Code::Ok;
   }
 
- private:
-  virtual Mif::Net::Http::Code StoreMessage(
-      int message_id, const std::string& message_body) override {
-    const auto message = Message(message_body);
-    auto json_message = message.ToJson(message_id).toStyledString();
+  void SendMessageToSecondaries(InternalMessage message,
+                                std::size_t write_concern) {
+    // TODO: Readability - move lambdas to class methods?
+    auto SendMessages =
+        [this](InternalMessage message) -> std::vector<NodeResponce> {
+      auto json_message = message.ToJson().toStyledString();
+      std::vector<NodeResponce> node_response;
+      node_response.reserve(m_secondaries.size());
 
-    std::size_t current_concert_level = 1;
-    std::vector<std::pair<std::string, std::future<cpr::Response>>>
-        node_response;
-    node_response.reserve(m_secondaries.size());
-    std::chrono::system_clock::time_point timeout =
-        std::chrono::system_clock::now() +
-        std::chrono::milliseconds(m_responce_timeout);
-    for (const auto secondary : m_secondaries) {
-      std::string url_string = secondary.host + ":" + secondary.port;
+      for (const auto secondary : m_secondaries) {
+        std::string url_string = secondary.host + ":" + secondary.port;
+        std::promise<cpr::Response> p1;
+        std::future<cpr::Response> f_completes = p1.get_future();
+        std::thread(
+            [](std::promise<cpr::Response> p1, const std::string& url_str,
+               const std::string& mesage_str) {
+              cpr::Response r =
+                  cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str));
+              p1.set_value_at_thread_exit(r);
+            },
+            std::move(p1), url_string, json_message)
+            .detach();
 
-      std::promise<cpr::Response> p1;
-      std::future<cpr::Response> f_completes = p1.get_future();
-      std::thread(
-          [](std::promise<cpr::Response> p1, const std::string& url_str,
-             const std::string& mesage_str) {
-            cpr::Response r =
-                cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str));
-            p1.set_value_at_thread_exit(r);
-          },
-          std::move(p1), url_string, json_message)
-          .detach();
-
-      node_response.push_back(
-          std::make_pair(url_string, std::move(f_completes)));
-    }
-
-    // Gather results
-    for (auto& responce : node_response) {
-      MIF_LOG(Info) << "secondary node " << responce.first;
-      if (std::future_status::ready == responce.second.wait_until(timeout)) {
-        auto status_code = responce.second.get().status_code;
-        if (status_code == cpr::status::HTTP_OK) {
-          MIF_LOG(Info) << "Done!";
-          current_concert_level++;
-        } else {
-          MIF_LOG(Info) << "Post message is not successfull. Status code "
-                        << status_code;
-        }
-      } else {
-        MIF_LOG(Info) << "Post message confirmation is not received";
+        const bool kResponceReceived = false;
+        node_response.emplace_back(NodeResponce{url_string, kResponceReceived,
+                                                std::move(f_completes)});
       }
-    }
+      return node_response;
+    };
 
-    if (current_concert_level >= m_write_concern) {
-      // write message to master node. Responce OK
-      m_messages[message_id] = message;
-      return Mif::Net::Http::Code::Ok;
-    } else {
-      // do not write message. response
-      return Mif::Net::Http::Code::NotModified;
-    }
+    auto GatherResponses =
+        [this](std::vector<NodeResponce>& node_response,
+               const std::chrono::system_clock::time_point& timeout)
+        -> std::size_t {
+      std::size_t current_concert_level = 1;
+      for (auto& responce : node_response) {
+        if (responce.is_received) {
+          current_concert_level++;
+        } else if (std::future_status::ready ==
+                   responce.furute.wait_until(timeout)) {
+          const auto http_response = responce.furute.get();
+          responce.is_received = true;
+          auto status_code = http_response.status_code;
+          if (cpr::status::HTTP_OK == status_code) {
+            current_concert_level++;
+          } else {
+            MIF_LOG(Info) << "secondary node " << responce.url
+                          << " post message is not successfull. Status code "
+                          << status_code;
+          }
+        } else {
+          MIF_LOG(Info) << "secondary node " << responce.url
+                        << " post message confirmation is not received";
+        }
+      }
+      return current_concert_level;
+    };
+
+    auto node_responce = SendMessages(message);
+
+    std::chrono::milliseconds retry_delay;
+    std::chrono::system_clock::time_point timeout;
+    do {
+      retry_delay = std::chrono::milliseconds(m_responce_timeout);
+      timeout = std::chrono::system_clock::now() + retry_delay;
+    } while (write_concern > GatherResponses(node_responce, timeout));
   }
 
   std::vector<Secondary> m_secondaries;
-  std::size_t m_write_concern{1};
   std::size_t m_responce_timeout{1000};
+  std::size_t m_message_id{0};
 };
 
 namespace {
 namespace Detail {
 namespace Config {
 using SecondaryNodes = MIF_STATIC_STR("secondarynodes");
-using WriteConcernLevel = MIF_STATIC_STR("writeconcernlevel");
 using ResponseTimeout = MIF_STATIC_STR("responsetimeout");
 }  // namespace Config
 }  // namespace Detail
@@ -141,12 +152,6 @@ class LogApplication : public Mif::Application::HttpServer {
             ->default_value(""),
         "List of secondary nodes in a format host1:port1;host2:port2 "
         "(0.0.0.0:55555,0.0.0.0:44444)")(
-        Detail::Config::WriteConcernLevel::Value,
-        boost::program_options::value<std::size_t>(&m_write_concern_level)
-            ->default_value(1),
-        "Write concern level. Perform append only if the amount of write "
-        "confirmations received before the timeout is bigger than write "
-        "concern level")(
         Detail::Config::ResponseTimeout::Value,
         boost::program_options::value<std::size_t>(&m_response_timeout_ms)
             ->default_value(1000),
@@ -161,13 +166,10 @@ class LogApplication : public Mif::Application::HttpServer {
         "/", std::bind(&ReplicatedLogMaster::RequestHandler, m_replicated_log,
                        std::placeholders::_1, std::placeholders::_2));
     m_replicated_log->SetSecondaryNodesList(m_secondaries);
-    m_replicated_log->SetupWriteConcern(m_write_concern_level,
-                                        m_response_timeout_ms);
   }
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
   std::string m_secondaries;
-  std::size_t m_write_concern_level;
   std::size_t m_response_timeout_ms;
 };
 

@@ -10,12 +10,14 @@ class ReplicatedLogSecondary : public ReplicatedLogNode {
   }
 
  private:
-  virtual Mif::Net::Http::Code StoreMessage(
-      int message_id, const std::string& message_body) override {
+  virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override {
     std::this_thread::sleep_for(std::chrono::milliseconds(m_response_delay_ms));
+
+    const std::size_t message_id = node["id"].asUInt();
+    const auto message_body = node["message"].asString();
     auto id_position = m_messages.find(message_id);
     if (id_position == m_messages.end()) {
-      m_messages[message_id] = Message(message_body);
+      m_messages[message_id] = InternalMessage(message_id, message_body);
     } else {
       // Nothing, message is present in database
     }

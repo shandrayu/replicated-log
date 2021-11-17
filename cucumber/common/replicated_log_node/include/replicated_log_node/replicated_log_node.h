@@ -22,17 +22,13 @@
 class ReplicatedLogNode {
  public:
   // TODO: public data fields, struct instead of class...
-  // TODO: create two Message classes: internal and external
-  // internal: id, data
-  // external: data, write_concern
-  struct Message {
-    Message() = default;
-    Message(const std::string& string);
-    // TODO: id shall be a field in this class
-    Json::Value ToJson(int id) const;
+  struct InternalMessage {
+    InternalMessage() = default;
+    InternalMessage(int id, const std::string& string);
+    Json::Value ToJson() const;
+    Json::Value ToJsonDataOnly() const;
+    int id;
     std::string data;
-    // TODO: is json really needed here? What it represents?
-    Json::Value json;
   };
 
   ReplicatedLogNode();
@@ -43,8 +39,7 @@ class ReplicatedLogNode {
   virtual ~ReplicatedLogNode() = default;
 
  private:
-  virtual Mif::Net::Http::Code StoreMessage(int message_id,
-                                            const std::string& message_body);
+  virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node);
 
   void GetHandler(Mif::Net::Http::IInputPack const& request,
                   Mif::Net::Http::IOutputPack& response);
@@ -52,7 +47,7 @@ class ReplicatedLogNode {
                    Mif::Net::Http::IOutputPack& response);
 
  protected:
-  std::map<int, Message> m_messages;
+  std::map<int, InternalMessage> m_messages;
   // TODO: Implementation details
   std::unique_ptr<Json::CharReader> m_char_reader;
 };

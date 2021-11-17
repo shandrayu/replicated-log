@@ -2,17 +2,11 @@
 
 namespace {
 namespace detail {
-// std::string json_node_to_string(const Json::Value& node) {
-//   Json::StreamWriterBuilder builder;
-//   return Json::writeString(builder, node);
-// }
-
 std::vector<char> convert_messages_to_buffer(
-    const std::map<int, ReplicatedLogNode::Message>& messages) {
+    const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
   Json::Value message_array(Json::arrayValue);
   for (const auto& message : messages) {
-    MIF_LOG(Info) << message.first << ": " << message.second.data;
-    message_array.append(message.second.ToJson(message.first));
+    message_array.append(message.second.ToJsonDataOnly());
   }
 
   std::vector<char> buffer;
@@ -25,11 +19,19 @@ std::vector<char> convert_messages_to_buffer(
 }  // namespace detail
 }  // namespace
 
-ReplicatedLogNode::Message::Message(const std::string& string) : data(string) {}
+ReplicatedLogNode::InternalMessage::InternalMessage(int id,
+                                                    const std::string& string)
+    : id(id), data(string) {}
 
-Json::Value ReplicatedLogNode::Message::ToJson(int id) const {
+Json::Value ReplicatedLogNode::InternalMessage::ToJson() const {
   Json::Value node;
   node["id"] = id;
+  node["message"] = data;
+  return node;
+}
+
+Json::Value ReplicatedLogNode::InternalMessage::ToJsonDataOnly() const {
+  Json::Value node;
   node["message"] = data;
   return node;
 }
@@ -49,10 +51,8 @@ void ReplicatedLogNode::RequestHandler(
   }
 }
 
-Mif::Net::Http::Code ReplicatedLogNode::StoreMessage(
-    int message_id, const std::string& message_body) {
-  Mif::Common::Unused(message_id);
-  Mif::Common::Unused(message_body);
+Mif::Net::Http::Code ReplicatedLogNode::StoreMessage(const Json::Value& node) {
+  Mif::Common::Unused(node);
   return Mif::Net::Http::Code::NotImplemented;
 }
 
@@ -86,10 +86,8 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
     return;
   }
 
-  const auto id = root["id"].asInt();
-  const auto message_body = root["message"].asString();
+  const auto status = StoreMessage(root);
 
-  const auto status = StoreMessage(id, message_body);
   MIF_LOG(Info) << "Done! Status "
                 << ((Mif::Net::Http::Code::Ok == status) ? "OK" : "not OK :)");
   response.SetCode(status);
