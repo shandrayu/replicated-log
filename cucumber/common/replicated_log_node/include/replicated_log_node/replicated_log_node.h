@@ -47,6 +47,7 @@ class ReplicatedLogNode {
                    Mif::Net::Http::IOutputPack& response);
 
  protected:
+  std::mutex m_message_queue_mutex;
   std::map<int, InternalMessage> m_messages;
   // TODO: Implementation details
   std::unique_ptr<Json::CharReader> m_char_reader;

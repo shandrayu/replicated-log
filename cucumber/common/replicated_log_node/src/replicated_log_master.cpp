@@ -19,75 +19,43 @@ void ReplicatedLogMaster::SetSecondaryNodesList(
 Mif::Net::Http::Code ReplicatedLogMaster::StoreMessage(
     const Json::Value& node) {
   const auto message_body = node["message"].asString();
-  const std::size_t write_concern = node["write_concern"].asUInt();
-  const auto message = InternalMessage(m_message_id, message_body);
-  m_messages[m_message_id] = message;
+  const int write_concern = node["write_concern"].asInt();
+  InternalMessage message;
+  {
+    std::lock_guard<std::mutex> lck(m_message_queue_mutex);
+    message = InternalMessage(m_message_id, message_body);
+    m_messages[m_message_id++] = message;
+  }
+
   SendMessageToSecondaries(message, write_concern);
-  m_message_id++;
   return Mif::Net::Http::Code::Ok;
 }
 
 void ReplicatedLogMaster::SendMessageToSecondaries(InternalMessage message,
-                                                   std::size_t write_concern) {
-  auto node_responce = SendMessages(message);
-
-  std::chrono::milliseconds retry_delay;
-  std::chrono::system_clock::time_point timeout;
-  do {
-    retry_delay = std::chrono::milliseconds(m_responce_timeout);
-    timeout = std::chrono::system_clock::now() + retry_delay;
-  } while (write_concern > GatherResponses(node_responce, timeout));
-}
-
-std::vector<ReplicatedLogMaster::NodeResponce>
-ReplicatedLogMaster::SendMessages(InternalMessage message) {
+                                                   int write_concern) {
   auto json_message = message.ToJson().toStyledString();
-  std::vector<NodeResponce> node_response;
-  node_response.reserve(m_secondaries.size());
 
-  for (const auto secondary : m_secondaries) {
+  auto countdown = std::make_shared<CountDownLatch>(write_concern - 1);
+  for (const auto& secondary : m_secondaries) {
     std::string url_string = secondary.host + ":" + secondary.port;
-    std::promise<cpr::Response> p1;
-    std::future<cpr::Response> f_completes = p1.get_future();
     std::thread(
-        [](std::promise<cpr::Response> p1, const std::string& url_str,
-           const std::string& mesage_str) {
-          cpr::Response r = cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str));
-          p1.set_value_at_thread_exit(r);
+        [](std::shared_ptr<CountDownLatch> countdown,
+           const std::string& url_str, const std::string& mesage_str) {
+          cpr::Response responce =
+              cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str));
+          if (cpr::status::HTTP_OK == responce.status_code) {
+            countdown->count_down();
+          } else {
+            // In case is we received error responce from the node we cannot
+            // increase counter
+            MIF_LOG(Info) << "secondary node " << url_str
+                          << " post message is not successfull. Status code "
+                          << responce.status_code;
+          }
         },
-        std::move(p1), url_string, json_message)
+        countdown, url_string, json_message)
         .detach();
-
-    const bool kResponceReceived = false;
-    node_response.emplace_back(
-        NodeResponce{url_string, kResponceReceived, std::move(f_completes)});
   }
-  return node_response;
+  // TODO: Implement wait with timeout?
+  countdown->await(/*timeout*/);
 }
-
-std::size_t ReplicatedLogMaster::GatherResponses(
-    std::vector<ReplicatedLogMaster::NodeResponce>& node_response,
-    const std::chrono::system_clock::time_point& timeout) {
-  std::size_t current_concert_level = 1;
-  for (auto& responce : node_response) {
-    if (responce.is_received) {
-      current_concert_level++;
-    } else if (std::future_status::ready ==
-               responce.furute.wait_until(timeout)) {
-      const auto http_response = responce.furute.get();
-      responce.is_received = true;
-      auto status_code = http_response.status_code;
-      if (cpr::status::HTTP_OK == status_code) {
-        current_concert_level++;
-      } else {
-        MIF_LOG(Info) << "secondary node " << responce.url
-                      << " post message is not successfull. Status code "
-                      << status_code;
-      }
-    } else {
-      MIF_LOG(Info) << "secondary node " << responce.url
-                    << " post message confirmation is not received";
-    }
-  }
-  return current_concert_level;
-};

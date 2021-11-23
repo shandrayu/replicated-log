@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "countdown_latch/countdown_latch.h"
 #include "replicated_log_node/replicated_log_node.h"
 
 class ReplicatedLogMaster : public ReplicatedLogNode {
@@ -22,8 +23,7 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
 
   struct NodeResponce {
     std::string url;
-    bool is_received;
-    std::future<cpr::Response> furute;
+    cpr::Response responce;
   };
 
   ReplicatedLogMaster() = default;
@@ -33,13 +33,8 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
 
  private:
   virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override;
-  void SendMessageToSecondaries(InternalMessage message,
-                                std::size_t write_concern);
-  std::vector<NodeResponce> SendMessages(InternalMessage message);
-  std::size_t GatherResponses(
-      std::vector<NodeResponce>& node_response,
-      const std::chrono::system_clock::time_point& timeout);
-      
+  void SendMessageToSecondaries(InternalMessage message, int write_concern);
+
   std::vector<Secondary> m_secondaries;
   std::size_t m_responce_timeout{1000};
   std::size_t m_message_id{0};

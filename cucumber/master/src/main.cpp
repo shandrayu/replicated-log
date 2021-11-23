@@ -39,10 +39,10 @@ class LogApplication : public Mif::Application::HttpServer {
 
  private:
   virtual void Init(Mif::Net::Http::ServerHandlers& handlers) override final {
+    m_replicated_log->SetSecondaryNodesList(m_secondaries);
     handlers.emplace(
         "/", std::bind(&ReplicatedLogMaster::RequestHandler, m_replicated_log,
                        std::placeholders::_1, std::placeholders::_2));
-    m_replicated_log->SetSecondaryNodesList(m_secondaries);
   }
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
