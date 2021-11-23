@@ -38,8 +38,6 @@ curl -iv -X GET "http://localhost:55555/" -H "Connection: close"
 
 - Waiting for the response is implemented as "retry with increasing timeout"
   - CountDownLatch can be implemented
-- Code organization
-  - Code is in one file and has to be refactored for the further use
 - No synchronization
   - Node's internal data storage is not protected by mutex or other synchronization primitive. While it's not an issue in this setup, the internal storage shall be guarded with mutex
 - Docker networking
