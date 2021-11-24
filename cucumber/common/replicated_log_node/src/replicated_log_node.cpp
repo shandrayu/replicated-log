@@ -61,9 +61,12 @@ void ReplicatedLogNode::GetHandler(Mif::Net::Http::IInputPack const& request,
   auto const data = request.GetData();
   MIF_LOG(Info) << "Get: Received bytes: " << data.size()
                 << ". Start processing...";
-
-  auto converted_messages = detail::convert_messages_to_buffer(m_messages);
-  response.SetData(std::move(converted_messages));
+  {
+    std::lock_guard<std::mutex> lck(m_message_queue_mutex);
+    auto converted_messages = detail::convert_messages_to_buffer(m_messages);
+    // TODO: move out the lock? Left here for readability
+    response.SetData(std::move(converted_messages));
+  }
 
   MIF_LOG(Info) << "Get: Done!";
   response.SetCode(Mif::Net::Http::Code::Ok);
@@ -74,7 +77,6 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
   auto const data = request.GetData();
   MIF_LOG(Info) << "Post: Received bytes: " << data.size()
                 << ". Start processing...";
-  ;
 
   Json::Value root;
   std::string errors;

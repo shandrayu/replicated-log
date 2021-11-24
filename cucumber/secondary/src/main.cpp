@@ -1,31 +1,4 @@
-#include "replicated_log_node/replicated_log_node.h"
-
-class ReplicatedLogSecondary : public ReplicatedLogNode {
- public:
-  ReplicatedLogSecondary() = default;
-  virtual ~ReplicatedLogSecondary() = default;
-
-  void SetResponceDelay(const std::size_t& delay) {
-    m_response_delay_ms = delay;
-  }
-
- private:
-  virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override {
-    std::this_thread::sleep_for(std::chrono::milliseconds(m_response_delay_ms));
-
-    const std::size_t message_id = node["id"].asUInt();
-    const auto message_body = node["message"].asString();
-    auto id_position = m_messages.find(message_id);
-    if (id_position == m_messages.end()) {
-      m_messages[message_id] = InternalMessage(message_id, message_body);
-    } else {
-      // Nothing, message is present in database
-    }
-    return Mif::Net::Http::Code::Ok;
-  }
-
-  std::size_t m_response_delay_ms{0};
-};
+#include "replicated_log_node/replicated_log_secondary.h"
 
 namespace {
 namespace Detail {
