@@ -2,11 +2,32 @@
 
 namespace {
 namespace detail {
-std::vector<char> convert_messages_to_buffer(
+std::vector<char> convert_all_messages_to_buffer(
     const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
   Json::Value message_array(Json::arrayValue);
   for (const auto& message : messages) {
     message_array.append(message.second.ToJsonDataOnly());
+  }
+
+  std::vector<char> buffer;
+  const std::string messages_str = message_array.toStyledString();
+  for (const auto& symbol : messages_str) {
+    buffer.push_back(symbol);
+  }
+  return buffer;
+}
+
+std::vector<char> convert_consecutive_messages_to_buffer(
+    const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
+  Json::Value message_array(Json::arrayValue);
+  int previous_id = -1;
+  for (const auto& message : messages) {
+    if (message.first != previous_id + 1) {
+      // The message has ID bigger than expected, do not show it
+      break;
+    }
+    message_array.append(message.second.ToJsonDataOnly());
+    previous_id = message.first;
   }
 
   std::vector<char> buffer;
@@ -63,7 +84,8 @@ void ReplicatedLogNode::GetHandler(Mif::Net::Http::IInputPack const& request,
                 << ". Start processing...";
   {
     std::lock_guard<std::mutex> lck(m_message_queue_mutex);
-    auto converted_messages = detail::convert_messages_to_buffer(m_messages);
+    auto converted_messages =
+        detail::convert_consecutive_messages_to_buffer(m_messages);
     // TODO: move out the lock? Left here for readability
     response.SetData(std::move(converted_messages));
   }

@@ -8,12 +8,19 @@ class ReplicatedLogSecondary : public ReplicatedLogNode {
   ReplicatedLogSecondary() = default;
   virtual ~ReplicatedLogSecondary() = default;
 
-  void SetResponceDelay(const std::size_t& delay);
+  void SetResponceDelay(const std::size_t delay);
+  void SetServerErrorMessageId(const int id);
 
  private:
   virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override;
 
+  struct ServerError {
+    int message_id{-1};
+    bool triggered{false};
+  };
+
   std::size_t m_response_delay_ms{0};
+  ServerError m_server_error;
 };
 
 #endif  // REPLICATED_LOG_NODE_REPLICATED_LOG_SECONDARY_H__
