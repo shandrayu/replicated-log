@@ -8,7 +8,6 @@ namespace {
 namespace Detail {
 namespace Config {
 using SecondaryNodes = MIF_STATIC_STR("secondarynodes");
-using ResponseTimeout = MIF_STATIC_STR("responsetimeout");
 }  // namespace Config
 }  // namespace Detail
 }  // namespace
@@ -28,11 +27,7 @@ class LogApplication : public Mif::Application::HttpServer {
         boost::program_options::value<std::string>(&m_secondaries)
             ->default_value(""),
         "List of secondary nodes in a format host1:port1;host2:port2 "
-        "(0.0.0.0:55555,0.0.0.0:44444)")(
-        Detail::Config::ResponseTimeout::Value,
-        boost::program_options::value<std::size_t>(&m_response_timeout_ms)
-            ->default_value(1000),
-        "Secondary node response timeout, ms");
+        "(0.0.0.0:55555,0.0.0.0:44444)");
 
     AddCustomOptions(options);
   }
@@ -47,7 +42,6 @@ class LogApplication : public Mif::Application::HttpServer {
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
   std::string m_secondaries;
-  std::size_t m_response_timeout_ms;
 };
 
 int main(int argc, char const** argv) {
