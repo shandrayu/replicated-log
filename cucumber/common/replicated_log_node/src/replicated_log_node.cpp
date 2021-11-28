@@ -112,7 +112,7 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
 
   const auto status = StoreMessage(root);
 
-  MIF_LOG(Info) << "Done! Status "
+  MIF_LOG(Info) << "Post: Done! Status "
                 << ((Mif::Net::Http::Code::Ok == status) ? "OK" : "not OK :)");
   response.SetCode(status);
 }
