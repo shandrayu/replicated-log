@@ -30,13 +30,16 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
   virtual ~ReplicatedLogMaster() = default;
 
   void SetSecondaryNodesList(const std::string& secondary_nodes);
+  void EnableRetry(bool enable);
 
  private:
   virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override;
   void SendMessageToSecondaries(InternalMessage message, int write_concern);
 
   std::vector<Secondary> m_secondaries;
+  bool m_retry{false};
   std::size_t m_responce_timeout{1000};
+
   std::size_t m_message_id{0};
 };
 

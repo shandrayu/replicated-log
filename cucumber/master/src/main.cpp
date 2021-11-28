@@ -8,7 +8,7 @@ namespace {
 namespace Detail {
 namespace Config {
 using SecondaryNodes = MIF_STATIC_STR("secondarynodes");
-using ResponseTimeout = MIF_STATIC_STR("responsetimeout");
+using Retry = MIF_STATIC_STR("retry");
 }  // namespace Config
 }  // namespace Detail
 }  // namespace
@@ -29,10 +29,9 @@ class LogApplication : public Mif::Application::HttpServer {
             ->default_value(""),
         "List of secondary nodes in a format host1:port1;host2:port2 "
         "(0.0.0.0:55555,0.0.0.0:44444)")(
-        Detail::Config::ResponseTimeout::Value,
-        boost::program_options::value<std::size_t>(&m_response_timeout_ms)
-            ->default_value(1000),
-        "Secondary node response timeout, ms");
+        Detail::Config::Retry::Value,
+        boost::program_options::bool_switch(&m_retry)->default_value(false),
+        "Enable retry functionality");
 
     AddCustomOptions(options);
   }
@@ -40,6 +39,7 @@ class LogApplication : public Mif::Application::HttpServer {
  private:
   virtual void Init(Mif::Net::Http::ServerHandlers& handlers) override final {
     m_replicated_log->SetSecondaryNodesList(m_secondaries);
+    m_replicated_log->EnableRetry(m_retry);
     handlers.emplace(
         "/", std::bind(&ReplicatedLogMaster::RequestHandler, m_replicated_log,
                        std::placeholders::_1, std::placeholders::_2));
@@ -47,7 +47,7 @@ class LogApplication : public Mif::Application::HttpServer {
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
   std::string m_secondaries;
-  std::size_t m_response_timeout_ms;
+  bool m_retry;
 };
 
 int main(int argc, char const** argv) {

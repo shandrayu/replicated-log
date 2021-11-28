@@ -16,6 +16,8 @@ void ReplicatedLogMaster::SetSecondaryNodesList(
   }
 }
 
+void ReplicatedLogMaster::EnableRetry(bool enable) { m_retry = enable; }
+
 Mif::Net::Http::Code ReplicatedLogMaster::StoreMessage(
     const Json::Value& node) {
   const auto message_body = node["message"].asString();
@@ -40,20 +42,30 @@ void ReplicatedLogMaster::SendMessageToSecondaries(InternalMessage message,
     std::string url_string = secondary.host + ":" + secondary.port;
     std::thread(
         [](std::shared_ptr<CountDownLatch> countdown,
-           const std::string& url_str, const std::string& mesage_str) {
-          cpr::Response responce =
-              cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str));
+           const std::string& url_str, const std::string& mesage_str,
+           bool retry_if_failed) {
+          cpr::Response responce;
+          std::size_t response_delay_ms = 1;
+          int responce_timeout_ms = 5000;
+          do {
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(response_delay_ms));
+            MIF_LOG(Info) << "Try to send message to " << url_str
+                          << " with response_delay " << response_delay_ms
+                          << " ms";
+            responce = cpr::Post(cpr::Url{url_str}, cpr::Body(mesage_str),
+                                 cpr::Timeout{responce_timeout_ms});
+            response_delay_ms *= 2;
+          } while (cpr::status::HTTP_OK != responce.status_code &&
+                   retry_if_failed);
           if (cpr::status::HTTP_OK == responce.status_code) {
+            MIF_LOG(Info) << "Message to " << url_str << " sent!";
             countdown->count_down();
           } else {
-            // In case is we received error responce from the node we cannot
-            // increase counter
-            MIF_LOG(Info) << "secondary node " << url_str
-                          << " post message is not successfull. Status code "
-                          << responce.status_code;
+            MIF_LOG(Info) << "Message to " << url_str << " is not sent!";
           }
         },
-        countdown, url_string, json_message)
+        countdown, url_string, json_message, m_retry)
         .detach();
   }
   // TODO: Implement wait with timeout?

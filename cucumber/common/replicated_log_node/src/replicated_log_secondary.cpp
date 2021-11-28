@@ -1,7 +1,11 @@
 #include "replicated_log_node/replicated_log_secondary.h"
 
-void ReplicatedLogSecondary::SetResponceDelay(const std::size_t& delay) {
+void ReplicatedLogSecondary::SetResponceDelay(const std::size_t delay) {
   m_response_delay_ms = delay;
+}
+
+void ReplicatedLogSecondary::SetServerErrorMessageId(const int id) {
+  m_server_error.message_id = id;
 }
 
 Mif::Net::Http::Code ReplicatedLogSecondary::StoreMessage(
@@ -10,6 +14,11 @@ Mif::Net::Http::Code ReplicatedLogSecondary::StoreMessage(
   {
     std::lock_guard<std::mutex> lck(m_message_queue_mutex);
     const std::size_t message_id = node["id"].asUInt();
+    if (m_server_error.message_id == message_id && !m_server_error.triggered) {
+      // Skip message with this ID only once
+      m_server_error.triggered = true;
+      return Mif::Net::Http::Code::Internal;
+    }
     const auto message_body = node["message"].asString();
     auto id_position = m_messages.find(message_id);
     if (id_position == m_messages.end()) {
