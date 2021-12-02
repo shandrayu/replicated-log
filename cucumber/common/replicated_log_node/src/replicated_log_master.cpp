@@ -36,6 +36,11 @@ void ReplicatedLogMaster::NodeHealth::Update(const std::int32_t cpr_status) {
   }
 }
 
+bool ReplicatedLogMaster::NodeHealth::isOk() const {
+  return NodeHealth::Status::Healthy == status ||
+         NodeHealth::Status::Suspected == status;
+}
+
 ReplicatedLogMaster::ReplicatedLogMaster() {
   m_health_check_thread = std::thread([this]() {
     do {
@@ -98,6 +103,10 @@ void ReplicatedLogMaster::EnableRetry(bool enable) { m_retry = enable; }
 
 Mif::Net::Http::Code ReplicatedLogMaster::StoreMessage(
     const Json::Value& node) {
+  if (!HasQuorum()) {
+    return Mif::Net::Http::Code::NotModified;
+  }
+
   const auto message_body = node["message"].asString();
   const int write_concern = node["write_concern"].asInt();
   InternalMessage message;
@@ -159,4 +168,17 @@ void ReplicatedLogMaster::SendMessageToSecondaries(InternalMessage message,
   }
   // TODO: Implement wait with timeout?
   countdown->await(/*timeout*/);
+}
+
+bool ReplicatedLogMaster::HasQuorum() const {
+  const std::size_t num_quorum = m_secondaries.size() / 2 + 1;
+  std::size_t active_nodes = 1;
+
+  std::shared_lock<std::shared_mutex> lock(m_secondary_status_mutex);
+  for (const auto& node : m_secondary_health) {
+    if (node.second.isOk()) {
+      active_nodes++;
+    }
+  }
+  return active_nodes >= num_quorum;
 }

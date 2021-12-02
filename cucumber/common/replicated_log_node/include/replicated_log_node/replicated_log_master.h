@@ -30,6 +30,7 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
  private:
   virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override;
   void SendMessageToSecondaries(InternalMessage message, int write_concern);
+  bool HasQuorum() const;
 
   class Secondary {
    public:
@@ -46,7 +47,10 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
   struct NodeHealth {
     enum class Status : int { Healthy = 0, Suspected = 1, Unhealthy = 2 };
     // Status is a three-state state machine
+    // TODO: these interfece functions are uncomfortable to use because
+    // NodeHealth is not copyable
     void Update(const std::int32_t cpr_status);
+    bool isOk() const;
     // TODO: public data members
     Status status;
     // TODO: probably ill-formed implementation
