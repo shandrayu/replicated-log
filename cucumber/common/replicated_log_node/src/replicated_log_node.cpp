@@ -2,21 +2,6 @@
 
 namespace {
 namespace detail {
-std::vector<char> convert_all_messages_to_buffer(
-    const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
-  Json::Value message_array(Json::arrayValue);
-  for (const auto& message : messages) {
-    message_array.append(message.second.ToJsonDataOnly());
-  }
-
-  std::vector<char> buffer;
-  const std::string messages_str = message_array.toStyledString();
-  for (const auto& symbol : messages_str) {
-    buffer.push_back(symbol);
-  }
-  return buffer;
-}
-
 std::vector<char> convert_consecutive_messages_to_buffer(
     const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
   Json::Value message_array(Json::arrayValue);

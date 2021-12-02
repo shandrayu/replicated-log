@@ -9,6 +9,7 @@ namespace Detail {
 namespace Config {
 using SecondaryNodes = MIF_STATIC_STR("secondarynodes");
 using Retry = MIF_STATIC_STR("retry");
+using HealthCheckPeriod = MIF_STATIC_STR("healthcheckperiod");
 }  // namespace Config
 }  // namespace Detail
 }  // namespace
@@ -31,7 +32,11 @@ class LogApplication : public Mif::Application::HttpServer {
         "(0.0.0.0:55555,0.0.0.0:44444)")(
         Detail::Config::Retry::Value,
         boost::program_options::bool_switch(&m_retry)->default_value(false),
-        "Enable retry functionality");
+        "Enable retry functionality")(
+        Detail::Config::HealthCheckPeriod::Value,
+        boost::program_options::value<std::size_t>(&m_health_check_period_ms)
+            ->default_value(3000),
+        "Period to check the health status from secondary nodes");
 
     AddCustomOptions(options);
   }
@@ -40,6 +45,7 @@ class LogApplication : public Mif::Application::HttpServer {
   virtual void Init(Mif::Net::Http::ServerHandlers& handlers) override final {
     m_replicated_log->SetSecondaryNodesList(m_secondaries);
     m_replicated_log->EnableRetry(m_retry);
+    m_replicated_log->SetHealthCheckPeriod(m_health_check_period_ms);
     handlers.emplace(
         "/", std::bind(&ReplicatedLogMaster::RequestHandler, m_replicated_log,
                        std::placeholders::_1, std::placeholders::_2));
@@ -47,6 +53,7 @@ class LogApplication : public Mif::Application::HttpServer {
 
   std::shared_ptr<ReplicatedLogMaster> m_replicated_log;
   std::string m_secondaries;
+  std::size_t m_health_check_period_ms;
   bool m_retry;
 };
 

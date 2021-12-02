@@ -38,6 +38,11 @@ class LogApplication : public Mif::Application::HttpServer {
     handlers.emplace("/", std::bind(&ReplicatedLogSecondary::RequestHandler,
                                     m_replicated_log, std::placeholders::_1,
                                     std::placeholders::_2));
+    handlers.emplace(
+        "/health",
+        std::bind(&ReplicatedLogSecondary::HealthStatusRequestHandler,
+                  m_replicated_log, std::placeholders::_1,
+                  std::placeholders::_2));
     //  Pass application parameters to log node
     m_replicated_log->SetResponceDelay(m_response_delay);
     m_replicated_log->SetServerErrorMessageId(m_server_error_message_id);
