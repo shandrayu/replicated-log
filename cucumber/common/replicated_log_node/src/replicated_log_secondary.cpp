@@ -1,5 +1,16 @@
 #include "replicated_log_node/replicated_log_secondary.h"
 
+void ReplicatedLogSecondary::HealthStatusRequestHandler(
+    Mif::Net::Http::IInputPack const& request,
+    Mif::Net::Http::IOutputPack& response) {
+  if (request.GetType() == Mif::Net::Http::Method::Type::Get) {
+    auto const data = request.GetData();
+    MIF_LOG(Info) << "[Health] Status request: Start processing...";
+    MIF_LOG(Info) << "[Health] Status request: Done!";
+    response.SetCode(Mif::Net::Http::Code::Ok);
+  }
+}
+
 void ReplicatedLogSecondary::SetResponceDelay(const std::size_t delay) {
   m_response_delay_ms = delay;
 }

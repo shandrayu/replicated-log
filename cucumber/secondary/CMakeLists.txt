@@ -29,6 +29,7 @@ set(SOURCES
 )
 
 add_executable(${PROJECT_LC} ${HEADERS} ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+target_compile_features(${PROJECT_LC} PRIVATE cxx_std_17)
 target_include_directories(${PROJECT_LC} PRIVATE  ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/jsoncpp/dist)
 target_include_directories(${PROJECT_LC} PRIVATE  ${CMAKE_CURRENT_SOURCE_DIR}/../common/replicated_log_node/include)
 target_link_libraries(${PROJECT_LC} ${LIBRARIES})

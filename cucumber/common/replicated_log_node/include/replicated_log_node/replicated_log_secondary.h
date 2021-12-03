@@ -8,6 +8,9 @@ class ReplicatedLogSecondary : public ReplicatedLogNode {
   ReplicatedLogSecondary() = default;
   virtual ~ReplicatedLogSecondary() = default;
 
+  void HealthStatusRequestHandler(Mif::Net::Http::IInputPack const& request,
+                                  Mif::Net::Http::IOutputPack& response);
+
   void SetResponceDelay(const std::size_t delay);
   void SetServerErrorMessageId(const int id);
 
