@@ -104,7 +104,7 @@ void ReplicatedLogMaster::EnableRetry(bool enable) { m_retry = enable; }
 Mif::Net::Http::Code ReplicatedLogMaster::StoreMessage(
     const Json::Value& node) {
   if (!HasQuorum()) {
-    return Mif::Net::Http::Code::NotModified;
+    return Mif::Net::Http::Code::Unavaliable;
   }
 
   const auto message_body = node["message"].asString();

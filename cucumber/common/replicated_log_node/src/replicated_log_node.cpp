@@ -22,6 +22,27 @@ std::vector<char> convert_consecutive_messages_to_buffer(
   }
   return buffer;
 }
+
+std::vector<char> error_message_to_buffer(const Mif::Net::Http::Code& error) {
+  std::string message_str;
+  switch (error) {
+    case Mif::Net::Http::Code::Ok:
+      message_str = "Success";
+      break;
+    case Mif::Net::Http::Code::Unavaliable:
+      message_str = "Read-only mode - message is not recorded";
+      break;
+    default:
+      message_str = "Unknown error";
+      break;
+  }
+
+  std::vector<char> buffer;
+  for (const auto& symbol : message_str) {
+    buffer.push_back(symbol);
+  }
+  return buffer;
+}
 }  // namespace detail
 }  // namespace
 
@@ -100,4 +121,5 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
   MIF_LOG(Info) << "Post: Done! Status "
                 << ((Mif::Net::Http::Code::Ok == status) ? "OK" : "not OK :)");
   response.SetCode(status);
+  response.SetData(detail::error_message_to_buffer(status));
 }
