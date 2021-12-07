@@ -5,7 +5,8 @@ namespace detail {
 std::vector<char> convert_consecutive_messages_to_buffer(
     const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
   Json::Value message_array(Json::arrayValue);
-  int previous_id = -1;
+  // The first ID in the map can be not zero
+  int previous_id = messages.cbegin()->first - 1;
   for (const auto& message : messages) {
     if (message.first != previous_id + 1) {
       // The message has ID bigger than expected, do not show it
