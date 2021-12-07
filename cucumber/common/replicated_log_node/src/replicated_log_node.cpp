@@ -64,10 +64,7 @@ Json::Value ReplicatedLogNode::InternalMessage::ToJsonDataOnly() const {
   return node;
 }
 
-ReplicatedLogNode::ReplicatedLogNode() {
-  Json::CharReaderBuilder builder;
-  m_char_reader = std::unique_ptr<Json::CharReader>(builder.newCharReader());
-}
+ReplicatedLogNode::ReplicatedLogNode() {}
 
 void ReplicatedLogNode::RequestHandler(
     Mif::Net::Http::IInputPack const& request,
@@ -107,9 +104,12 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
   MIF_LOG(Info) << "Post: Received bytes: " << data.size()
                 << ". Start processing...";
 
+  Json::CharReaderBuilder builder;
+  const auto char_reader =
+      std::unique_ptr<Json::CharReader>(builder.newCharReader());
   Json::Value root;
   std::string errors;
-  bool parsing_successful = m_char_reader->parse(
+  bool parsing_successful = char_reader->parse(
       data.data(), data.data() + data.size(), &root, &errors);
   if (!parsing_successful) {
     MIF_LOG(Info) << "Error in message parsing: " << errors;
