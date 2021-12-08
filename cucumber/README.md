@@ -36,9 +36,13 @@ curl -iv -X GET "http://localhost:55555/" -H "Connection: close"
 
 ## TODO
 
-- Docker networking
-  - container builds and runs but static ip address and communication between containers is needed
+- Docker
+  - Optimize image size
+  - Docker compose setup - is it optimal?
+  - Reuse the image for all secondaries (do not build the new image for each secondary)
+  - Docker networking - best practices
 - Add faulty message handling to the nodes
+- Replace mif library to something more appropriate
 
 ## Useful commands
 
