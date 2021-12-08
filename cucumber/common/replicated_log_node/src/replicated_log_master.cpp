@@ -1,49 +1,12 @@
 #include "replicated_log_node/replicated_log_master.h"
 
-std::string ReplicatedLogMaster::GetStatusStr(
-    ReplicatedLogMaster::NodeHealth::Status status) const {
-  std::string status_str;
-  switch (status) {
-    case ReplicatedLogMaster::NodeHealth::Status::Healthy:
-      status_str = "Healthy";
-      break;
-    case ReplicatedLogMaster::NodeHealth::Status::Suspected:
-      status_str = "Suspected";
-      break;
-    case ReplicatedLogMaster::NodeHealth::Status::Unhealthy:
-      status_str = "Unhealthy";
-      break;
-    default:
-      status_str = "Unhealthy";
-      break;
-  }
-  return status_str;
-}
-
-ReplicatedLogMaster::Secondary::Secondary(const std::string& host,
-                                          const std::string& port)
-    : m_host(host), m_port(port) {
-  m_url = host + ":" + port;
-}
-
-void ReplicatedLogMaster::NodeHealth::Update(const std::int32_t cpr_status) {
-  if (cpr::status::HTTP_OK == cpr_status) {
-    status = Status::Healthy;
-  } else if (Status::Healthy == status) {
-    status = Status::Suspected;
-  } else {
-    status = Status::Unhealthy;
-  }
-}
-
-bool ReplicatedLogMaster::NodeHealth::isOk() const {
-  return NodeHealth::Status::Healthy == status ||
-         NodeHealth::Status::Suspected == status;
-}
+#include <boost/algorithm/string.hpp>
+#include <cpr/cpr.h>
+#include <mif/common/log.h>
 
 ReplicatedLogMaster::ReplicatedLogMaster() {}
 
-ReplicatedLogMaster::~ReplicatedLogMaster() { CleanupHealthCheckResources(); }
+ReplicatedLogMaster::~ReplicatedLogMaster() {}
 
 void ReplicatedLogMaster::SetSecondaryNodesList(
     const std::string& secondary_nodes) {
@@ -52,27 +15,26 @@ void ReplicatedLogMaster::SetSecondaryNodesList(
   // TODO: Rethink splitting the string by delimiter
   std::vector<std::string> results;
   boost::split(results, secondary_nodes, [](char c) { return c == ','; });
-  CleanupHealthCheckResources();
+  health_checker.Reset();
   m_secondaries.clear();
   std::vector<std::string> secondary_splitted;
   for (const auto& result : results) {
     boost::split(secondary_splitted, result, [](char c) { return c == ':'; });
     auto secondary = Secondary{secondary_splitted[0], secondary_splitted[1]};
     m_secondaries.emplace_back(secondary);
-    m_secondary_health.try_emplace(secondary.GetHash(), NodeHealth());
   }
-  SetupHealthCheckResources();
+  health_checker.Setup(m_secondaries);
 }
 
 void ReplicatedLogMaster::SetHealthCheckPeriod(const std::size_t period_ms) {
-  m_health_check_period_ms = period_ms;
+  health_checker.SetHealthCheckPeriod(period_ms);
 }
 
 void ReplicatedLogMaster::EnableRetry(bool enable) { m_retry = enable; }
 
 Mif::Net::Http::Code ReplicatedLogMaster::StoreMessage(
     const Json::Value& node) {
-  if (!HasQuorum()) {
+  if (!health_checker.HasQuorum()) {
     return Mif::Net::Http::Code::Unavaliable;
   }
 
@@ -105,19 +67,7 @@ void ReplicatedLogMaster::SendMessageToSecondaries(InternalMessage message,
                const int message_id, bool retry_if_failed) {
           cpr::Response responce;
           do {
-            {
-              // TODO: Move to NodeHealth
-              // Blocking function health_checker.WaitOkStatus(url_str);
-              std::shared_lock<std::shared_mutex> lock(
-                  m_secondary_status_mutex);
-              if (NodeHealth::Status::Healthy !=
-                  m_secondary_health.at(url_str).status) {
-                // wait for successful status notification
-                m_secondary_health.at(url_str).cv->wait(lock);
-              } else {
-                // can proceed with sending the message
-              }
-            }
+            health_checker.WaitOkStatus(url_str);
 
             MIF_LOG(Info) << "Try to send message id=" << message_id << " to "
                           << url_str;
@@ -141,63 +91,4 @@ void ReplicatedLogMaster::SendMessageToSecondaries(InternalMessage message,
   }
   // TODO: Implement wait with timeout?
   countdown->await(/*timeout*/);
-}
-
-void ReplicatedLogMaster::SetupHealthCheckResources() {
-  if (m_secondary_health.empty()) {
-    return;
-  }
-
-  m_terminate_health_status_check = false;
-  m_health_check_threads.reserve(m_secondaries.size());
-
-  const auto health_check_function = [this](const std::string& secondary_url,
-                                            const std::string& secondary_hash) {
-    do {
-      const cpr::Response responce =
-          cpr::Get(cpr::Url{secondary_url + "/health"},
-                   cpr::Timeout{m_responce_timeout});
-
-      std::unique_lock<std::shared_mutex> lock(m_secondary_status_mutex);
-      m_secondary_health.at(secondary_hash).Update(responce.status_code);
-      const auto status = m_secondary_health.at(secondary_hash).status;
-      MIF_LOG(Info) << "[Health] Secondary " << secondary_url
-                    << ": health status is " << GetStatusStr(status);
-      if (NodeHealth::Status::Healthy == status ||
-          NodeHealth::Status::Suspected == status) {
-        lock.unlock();
-        m_secondary_health.at(secondary_hash).cv->notify_all();
-      }
-
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(m_health_check_period_ms));
-    } while (!m_terminate_health_status_check);
-  };
-
-  for (const auto& secondary : m_secondaries) {
-    m_health_check_threads.emplace_back(std::thread(
-        health_check_function, secondary.GetUrl(), secondary.GetHash()));
-  }
-}
-
-void ReplicatedLogMaster::CleanupHealthCheckResources() {
-  m_terminate_health_status_check = true;
-  for (auto& thread : m_health_check_threads) {
-    if (thread.joinable()) {
-      thread.join();
-    }
-  }
-}
-
-bool ReplicatedLogMaster::HasQuorum() const {
-  const std::size_t num_quorum = m_secondaries.size() / 2 + 1;
-  std::size_t active_nodes = 1;
-
-  std::shared_lock<std::shared_mutex> lock(m_secondary_status_mutex);
-  for (const auto& node : m_secondary_health) {
-    if (node.second.isOk()) {
-      active_nodes++;
-    }
-  }
-  return active_nodes >= num_quorum;
 }
