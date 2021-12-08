@@ -5,7 +5,8 @@ namespace detail {
 std::vector<char> convert_consecutive_messages_to_buffer(
     const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
   Json::Value message_array(Json::arrayValue);
-  int previous_id = -1;
+  // The first ID in the map can be not zero
+  int previous_id = messages.cbegin()->first - 1;
   for (const auto& message : messages) {
     if (message.first != previous_id + 1) {
       // The message has ID bigger than expected, do not show it
@@ -18,6 +19,27 @@ std::vector<char> convert_consecutive_messages_to_buffer(
   std::vector<char> buffer;
   const std::string messages_str = message_array.toStyledString();
   for (const auto& symbol : messages_str) {
+    buffer.push_back(symbol);
+  }
+  return buffer;
+}
+
+std::vector<char> error_message_to_buffer(const Mif::Net::Http::Code& error) {
+  std::string message_str;
+  switch (error) {
+    case Mif::Net::Http::Code::Ok:
+      message_str = "Success";
+      break;
+    case Mif::Net::Http::Code::Unavaliable:
+      message_str = "Read-only mode - message is not recorded";
+      break;
+    default:
+      message_str = "Unknown error";
+      break;
+  }
+
+  std::vector<char> buffer;
+  for (const auto& symbol : message_str) {
     buffer.push_back(symbol);
   }
   return buffer;
@@ -42,10 +64,7 @@ Json::Value ReplicatedLogNode::InternalMessage::ToJsonDataOnly() const {
   return node;
 }
 
-ReplicatedLogNode::ReplicatedLogNode() {
-  Json::CharReaderBuilder builder;
-  m_char_reader = std::unique_ptr<Json::CharReader>(builder.newCharReader());
-}
+ReplicatedLogNode::ReplicatedLogNode() {}
 
 void ReplicatedLogNode::RequestHandler(
     Mif::Net::Http::IInputPack const& request,
@@ -85,9 +104,12 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
   MIF_LOG(Info) << "Post: Received bytes: " << data.size()
                 << ". Start processing...";
 
+  Json::CharReaderBuilder builder;
+  const auto char_reader =
+      std::unique_ptr<Json::CharReader>(builder.newCharReader());
   Json::Value root;
   std::string errors;
-  bool parsing_successful = m_char_reader->parse(
+  bool parsing_successful = char_reader->parse(
       data.data(), data.data() + data.size(), &root, &errors);
   if (!parsing_successful) {
     MIF_LOG(Info) << "Error in message parsing: " << errors;
@@ -100,4 +122,5 @@ void ReplicatedLogNode::PostHandler(Mif::Net::Http::IInputPack const& request,
   MIF_LOG(Info) << "Post: Done! Status "
                 << ((Mif::Net::Http::Code::Ok == status) ? "OK" : "not OK :)");
   response.SetCode(status);
+  response.SetData(detail::error_message_to_buffer(status));
 }
