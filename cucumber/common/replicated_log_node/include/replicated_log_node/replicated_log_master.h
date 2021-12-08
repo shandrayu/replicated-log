@@ -30,6 +30,10 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
  private:
   virtual Mif::Net::Http::Code StoreMessage(const Json::Value& node) override;
   void SendMessageToSecondaries(InternalMessage message, int write_concern);
+  // TODO: Move to NodeHealth
+  void SetupHealthCheckResources();
+  // TODO: Move to NodeHealth
+  void CleanupHealthCheckResources();
   bool HasQuorum() const;
 
   class Secondary {
@@ -44,6 +48,8 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
     std::string m_url;
   };
 
+  // TODO: NodeHealth shall be a separate entity with interface, threads and
+  // m_terminate_health_status_check flag
   struct NodeHealth {
     enum class Status : int { Healthy = 0, Suspected = 1, Unhealthy = 2 };
     // Status is a three-state state machine
@@ -72,12 +78,16 @@ class ReplicatedLogMaster : public ReplicatedLogNode {
 
   std::string GetStatusStr(NodeHealth::Status status) const;
 
+  // TODO: Move to NodeHealth
   mutable std::shared_mutex m_secondary_status_mutex;
   std::vector<Secondary> m_secondaries;
   std::map<std::string, NodeHealth> m_secondary_health;
+  // TODO: Move to NodeHealth
   std::size_t m_health_check_period_ms{1000};
+  // TODO: Move to NodeHealth
   std::atomic_bool m_terminate_health_status_check{false};
-  std::thread m_health_check_thread;
+  // TODO: Move to NodeHealth
+  std::vector<std::thread> m_health_check_threads;
 
   bool m_retry{false};
   std::int32_t m_responce_timeout{1000};
