@@ -1,7 +1,5 @@
 FROM ubuntu:20.04
 
-EXPOSE 35353
-
 ENV DEBIAN_FRONTEND=noninteractive \ 
     WORKDIR="/opt" \
     APP_BIN="replicated_log_master" \

@@ -1,24 +1,32 @@
-version: "3.5"
+version: "3.4"
 services:
   master:
-    image: "master-node:1.0"
-    restart: on-failure
+    container_name: master
+    build:
+      dockerfile: Dockerfile
+      context: ./master
+    command: "./replicated_log_master --secondarynodes=host.docker.internal:3344,host.docker.internal:6767 --timeout=100000000 --retry --healthcheckperiod=8000"
+    depends_on:
+      - secondary_1
+      - secondary_2
     ports:
-      - "35353:35353"
-    command:
-        --secondarynodes=0.0.0.0:5555,0.0.0.0:44444,0.0.0.0:7777
+      - 55555:55555
+      
   secondary_1:
-    image: secondary-node:latest
-    restart: on-failure
+    container_name: secondary_1
+    build:
+      dockerfile: Dockerfile
+      context: ./secondary
+    command: "./replicated_log_secondary --port=3344"
     ports:
-      - "5555:45454"
+      - 3344:3344
+
   secondary_2:
-    image: secondary-node:1.1
-    restart: on-failure
+    container_name: secondary_2
+    build:
+      dockerfile: Dockerfile
+      context: ./secondary
+    command: "./replicated_log_secondary --port=6767"
     ports:
-      - "44444:45454"
-  secondary_3:
-    image: secondary-node:1.1
-    restart: on-failure
-    ports:
-      - "7777:45454"
+      - 6767:6767
+
