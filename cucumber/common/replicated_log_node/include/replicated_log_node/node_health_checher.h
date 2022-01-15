@@ -50,6 +50,7 @@ class NodeHealthChecker {
 
   std::size_t m_health_check_period_ms{1000};
 
+  // efficiency: std::string as a key - comparison may take a lot of time
   std::map<std::string, NodeHealth> m_health_status;
   std::atomic_bool m_terminate_health_status_check{false};
   mutable std::shared_mutex m_health_status_mutex;

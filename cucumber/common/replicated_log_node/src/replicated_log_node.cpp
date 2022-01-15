@@ -2,6 +2,7 @@
 
 namespace {
 namespace detail {
+  // naming: serialize 
 std::vector<char> convert_consecutive_messages_to_buffer(
     const std::map<int, ReplicatedLogNode::InternalMessage>& messages) {
   Json::Value message_array(Json::arrayValue);
@@ -24,6 +25,7 @@ std::vector<char> convert_consecutive_messages_to_buffer(
   return buffer;
 }
 
+// overengineering?
 std::vector<char> error_message_to_buffer(const Mif::Net::Http::Code& error) {
   std::string message_str;
   switch (error) {
@@ -39,6 +41,7 @@ std::vector<char> error_message_to_buffer(const Mif::Net::Http::Code& error) {
   }
 
   std::vector<char> buffer;
+  // buffer.assing()
   for (const auto& symbol : message_str) {
     buffer.push_back(symbol);
   }

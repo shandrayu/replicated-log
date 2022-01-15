@@ -33,6 +33,7 @@ void NodeHealthChecker::Setup(const std::vector<Secondary>& secondaries) {
     } while (!m_terminate_health_status_check);
   };
 
+  // efficiency: re-setup can be omited for all secondaries
   for (const auto& secondary : secondaries) {
     m_health_status[secondary.GetHash()].thread = std::move(std::thread(
         health_check_function, secondary.GetUrl(), secondary.GetHash()));
