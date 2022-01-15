@@ -2,6 +2,8 @@
 
 The Replicated Log is a course project for distributed systems course in Ukrainian Catholic University. It has the following deployment architecture: one Master and any number of Secondaries. Master accepts write requests and replicates the message to all Secondaries.
 
+![Architecture](images/replicated_log_architecture.png)
+
 ## How it works
 
 - External communication: REST
